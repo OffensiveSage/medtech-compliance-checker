@@ -1,0 +1,4 @@
+boto3
+moto[s3,ec2,iam,rds,cloudtrail,sns,sqs,dynamodb]
+pytest
+cfn-lint

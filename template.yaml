@@ -1,0 +1,146 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: MedTech Security Compliance Checker - scheduled Lambda with SNS alerts, S3 reports and a DynamoDB audit trail.
+
+Parameters:
+  AlertEmail:
+    Type: String
+    Description: Address that receives the compliance summary.
+  Schedule:
+    Type: String
+    Default: rate(1 day)
+    Description: EventBridge schedule expression for the check.
+
+Resources:
+  ComplianceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Runs the five MedTech security checks and reports the result.
+      CodeUri: src/compliance_checker/
+      Handler: app.lambda_handler
+      Runtime: python3.13
+      Timeout: 120
+      MemorySize: 256
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref AlertTopic
+          AUDIT_TABLE: !Ref AuditTable
+          REPORT_BUCKET: !Ref ReportBucket
+      Events:
+        DailyCheck:
+          Type: Schedule
+          Properties:
+            Schedule: !Ref Schedule
+            Description: Triggers the MedTech compliance check.
+      Policies:
+        # Read-only access to the services being checked.
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: ReadSecurityConfiguration
+              Effect: Allow
+              Action:
+                - s3:ListAllMyBuckets
+                - s3:GetBucketPolicy
+                - s3:GetBucketPublicAccessBlock
+                - ec2:DescribeSecurityGroups
+                - iam:ListUsers
+                - iam:ListUserPolicies
+                - iam:GetUserPolicy
+                - iam:ListAttachedUserPolicies
+                - iam:ListMFADevices
+                - iam:ListAccessKeys
+                - rds:DescribeDBInstances
+                - cloudtrail:DescribeTrails
+                - cloudtrail:GetTrailStatus
+              Resource: '*'
+        # Write access only to the checker's own outputs.
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: WriteReports
+              Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub '${ReportBucket.Arn}/reports/*'
+            - Sid: WriteAuditTrail
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:BatchWriteItem
+              Resource: !GetAtt AuditTable.Arn
+            - Sid: SendAlerts
+              Effect: Allow
+              Action: sns:Publish
+              Resource: !Ref AlertTopic
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: MedTech Security Alerts
+      KmsMasterKeyId: alias/aws/sns
+      Subscription:
+        - Endpoint: !Ref AlertEmail
+          Protocol: email
+
+  AuditTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: run_id
+          AttributeType: S
+        - AttributeName: item
+          AttributeType: S
+      KeySchema:
+        - AttributeName: run_id
+          KeyType: HASH
+        - AttributeName: item
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  ReportBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+
+  FailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The compliance checker itself failed to run.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ComplianceFunction
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+Outputs:
+  FunctionName:
+    Value: !Ref ComplianceFunction
+  ReportBucketName:
+    Value: !Ref ReportBucket
+  AuditTableName:
+    Value: !Ref AuditTable

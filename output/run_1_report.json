@@ -1,0 +1,136 @@
+{
+  "run_id": "20261012T223339Z-ed9935f7",
+  "started_at": "2026-10-12T22:33:39+00:00",
+  "finished_at": "2026-10-12T22:33:39+00:00",
+  "status": "NON_COMPLIANT",
+  "first_run": true,
+  "severity_counts": {
+    "CRITICAL": 4,
+    "HIGH": 3,
+    "MEDIUM": 1,
+    "LOW": 0
+  },
+  "checks": [
+    {
+      "check_id": "S3-PUBLIC",
+      "name": "S3 buckets exposed to the public",
+      "status": "FAIL",
+      "findings": 1
+    },
+    {
+      "check_id": "SG-OPEN",
+      "name": "Security groups open to the internet",
+      "status": "FAIL",
+      "findings": 2
+    },
+    {
+      "check_id": "IAM-ADMIN",
+      "name": "IAM users with administrator privileges",
+      "status": "FAIL",
+      "findings": 2
+    },
+    {
+      "check_id": "RDS-EXPOSURE",
+      "name": "RDS databases public or unencrypted",
+      "status": "FAIL",
+      "findings": 2
+    },
+    {
+      "check_id": "TRAIL-GAPS",
+      "name": "CloudTrail audit logging gaps",
+      "status": "FAIL",
+      "findings": 1
+    }
+  ],
+  "findings": [
+    {
+      "check_id": "IAM-ADMIN",
+      "severity": "CRITICAL",
+      "resource": "iam:user/medtech-assessment-developer",
+      "title": "Inline policy grants every action on every resource",
+      "detail": "Inline policy 'medtech-assessment-developer-policy' allows Action '*' on Resource '*'. MFA: NO, active access keys: 0.",
+      "remediation": "Delete the inline policy and grant only the actions the job needs, through a group or role.",
+      "hipaa": "164.308(a)(4) Information access management",
+      "key": "IAM-ADMIN|iam:user/medtech-assessment-developer|Inline policy grants every action on every resource",
+      "is_new": true
+    },
+    {
+      "check_id": "RDS-EXPOSURE",
+      "severity": "CRITICAL",
+      "resource": "rds:medtech-assessment-mysql",
+      "title": "Database is publicly accessible",
+      "detail": "PubliclyAccessible is true, so the endpoint resolves to a public IP.",
+      "remediation": "Set PubliclyAccessible to false and move the instance to private subnets.",
+      "hipaa": "164.312(a)(1) Access control",
+      "key": "RDS-EXPOSURE|rds:medtech-assessment-mysql|Database is publicly accessible",
+      "is_new": true
+    },
+    {
+      "check_id": "S3-PUBLIC",
+      "severity": "CRITICAL",
+      "resource": "s3://medtech-assessment-public-data-a1b2c3d4",
+      "title": "Bucket is readable by anyone on the internet",
+      "detail": "Bucket policy allows Principal '*' to call s3:GetObject, s3:ListBucket and Block Public Access is off.",
+      "remediation": "Turn on all four S3 Block Public Access settings and remove the public statement from the bucket policy.",
+      "hipaa": "164.312(a)(1) Access control",
+      "key": "S3-PUBLIC|s3://medtech-assessment-public-data-a1b2c3d4|Bucket is readable by anyone on the internet",
+      "is_new": true
+    },
+    {
+      "check_id": "SG-OPEN",
+      "severity": "CRITICAL",
+      "resource": "sg-04bfaf4f4efec5275 (medtech-assessment-database-sg)",
+      "title": "MySQL (3306) is open to the internet",
+      "detail": "Inbound rule allows 0.0.0.0/0 to reach database port 3306.",
+      "remediation": "Replace the 0.0.0.0/0 source with the application tier's security group.",
+      "hipaa": "164.312(e)(1) Transmission security",
+      "key": "SG-OPEN|sg-04bfaf4f4efec5275 (medtech-assessment-database-sg)|MySQL (3306) is open to the internet",
+      "is_new": true
+    },
+    {
+      "check_id": "IAM-ADMIN",
+      "severity": "HIGH",
+      "resource": "iam:user/medtech-assessment-admin",
+      "title": "AdministratorAccess is attached directly to a user",
+      "detail": "Long-lived user credentials carry full admin rights. MFA: NO, active access keys: 1.",
+      "remediation": "Move admin rights to a role assumed with MFA and remove the user's access keys.",
+      "hipaa": "164.308(a)(4) Information access management",
+      "key": "IAM-ADMIN|iam:user/medtech-assessment-admin|AdministratorAccess is attached directly to a user",
+      "is_new": true
+    },
+    {
+      "check_id": "RDS-EXPOSURE",
+      "severity": "HIGH",
+      "resource": "rds:medtech-assessment-mysql",
+      "title": "Database storage is not encrypted",
+      "detail": "StorageEncrypted is false, so data and snapshots sit unencrypted.",
+      "remediation": "Snapshot the instance, copy the snapshot with a KMS key, and restore from the encrypted copy.",
+      "hipaa": "164.312(a)(2)(iv) Encryption and decryption",
+      "key": "RDS-EXPOSURE|rds:medtech-assessment-mysql|Database storage is not encrypted",
+      "is_new": true
+    },
+    {
+      "check_id": "SG-OPEN",
+      "severity": "HIGH",
+      "resource": "sg-30826841278ab9dd9 (medtech-assessment-web-sg)",
+      "title": "SSH (22) is open to the internet",
+      "detail": "Inbound rule allows 0.0.0.0/0 to reach admin port 22.",
+      "remediation": "Restrict the source to the corporate IP range, or remove the rule and use SSM Session Manager.",
+      "hipaa": "164.312(a)(1) Access control",
+      "key": "SG-OPEN|sg-30826841278ab9dd9 (medtech-assessment-web-sg)|SSH (22) is open to the internet",
+      "is_new": true
+    },
+    {
+      "check_id": "TRAIL-GAPS",
+      "severity": "MEDIUM",
+      "resource": "cloudtrail:medtech-assessment-trail",
+      "title": "CloudTrail trail has audit logging gaps",
+      "detail": "Gaps: covers one region only; log file validation is off; logs are not encrypted with a KMS key; not delivered to CloudWatch Logs, so no alerting.",
+      "remediation": "Make the trail multi-region, enable log file validation and KMS encryption, and send it to CloudWatch Logs.",
+      "hipaa": "164.312(b) Audit controls",
+      "key": "TRAIL-GAPS|cloudtrail:medtech-assessment-trail|CloudTrail trail has audit logging gaps",
+      "is_new": true
+    }
+  ],
+  "resolved_since_last_run": []
+}

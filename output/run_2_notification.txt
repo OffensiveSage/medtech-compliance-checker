@@ -1,0 +1,54 @@
+Subject: [MedTech Security] NON_COMPLIANT: 2 critical, 3 high
+
+MedTech Security Compliance Check
+Run:    20261012T223339Z-f5715c25
+Time:   2026-10-12T22:33:39+00:00
+Status: NON_COMPLIANT
+
+Findings: 2 CRITICAL, 3 HIGH, 1 MEDIUM, 0 LOW
+Since last run: 0 new, 2 resolved
+
+Checks:
+  [S3-PUBLIC] S3 buckets exposed to the public: PASS, 0 finding(s)
+  [SG-OPEN] Security groups open to the internet: FAIL, 1 finding(s)
+  [IAM-ADMIN] IAM users with administrator privileges: FAIL, 2 finding(s)
+  [RDS-EXPOSURE] RDS databases public or unencrypted: FAIL, 2 finding(s)
+  [TRAIL-GAPS] CloudTrail audit logging gaps: FAIL, 1 finding(s)
+
+Findings, most severe first:
+  CRITICAL: Inline policy grants every action on every resource
+    Resource: iam:user/medtech-assessment-developer
+    Detail:   Inline policy 'medtech-assessment-developer-policy' allows Action '*' on Resource '*'. MFA: NO, active access keys: 0.
+    Fix:      Delete the inline policy and grant only the actions the job needs, through a group or role.
+    HIPAA:    164.308(a)(4) Information access management
+  CRITICAL: Database is publicly accessible
+    Resource: rds:medtech-assessment-mysql
+    Detail:   PubliclyAccessible is true, so the endpoint resolves to a public IP.
+    Fix:      Set PubliclyAccessible to false and move the instance to private subnets.
+    HIPAA:    164.312(a)(1) Access control
+  HIGH: AdministratorAccess is attached directly to a user
+    Resource: iam:user/medtech-assessment-admin
+    Detail:   Long-lived user credentials carry full admin rights. MFA: NO, active access keys: 1.
+    Fix:      Move admin rights to a role assumed with MFA and remove the user's access keys.
+    HIPAA:    164.308(a)(4) Information access management
+  HIGH: Database storage is not encrypted
+    Resource: rds:medtech-assessment-mysql
+    Detail:   StorageEncrypted is false, so data and snapshots sit unencrypted.
+    Fix:      Snapshot the instance, copy the snapshot with a KMS key, and restore from the encrypted copy.
+    HIPAA:    164.312(a)(2)(iv) Encryption and decryption
+  HIGH: SSH (22) is open to the internet
+    Resource: sg-30826841278ab9dd9 (medtech-assessment-web-sg)
+    Detail:   Inbound rule allows 0.0.0.0/0 to reach admin port 22.
+    Fix:      Restrict the source to the corporate IP range, or remove the rule and use SSM Session Manager.
+    HIPAA:    164.312(a)(1) Access control
+  MEDIUM: CloudTrail trail has audit logging gaps
+    Resource: cloudtrail:medtech-assessment-trail
+    Detail:   Gaps: covers one region only; log file validation is off; logs are not encrypted with a KMS key; not delivered to CloudWatch Logs, so no alerting.
+    Fix:      Make the trail multi-region, enable log file validation and KMS encryption, and send it to CloudWatch Logs.
+    HIPAA:    164.312(b) Audit controls
+
+Resolved since last run:
+  S3-PUBLIC|s3://medtech-assessment-public-data-a1b2c3d4|Bucket is readable by anyone on the internet
+  SG-OPEN|sg-04bfaf4f4efec5275 (medtech-assessment-database-sg)|MySQL (3306) is open to the internet
+
+Full report: s3://medtech-compliance-reports/reports/2026/10/12/20261012T223339Z-f5715c25.json
